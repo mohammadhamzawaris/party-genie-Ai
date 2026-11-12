@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PartyGenie AI - Smart Party Planner</title>
+
+    <script src="https://www.paypal.com/sdk/js?client-id=BAAq907DAUpYM3YdMo4Papgb08ePUmMVk-nKuYy9v1xRaAtHlh5Wg-WjEwfKCYCtlKA78g30rc4dcnLiyE&currency=USD"></script>
+
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: #333;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+            width: 90%;
+            max-width: 500px;
+        }
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 20px;
+            font-size: 15px;
+        }
+        textarea {
+            width: 100%;
+            height: 110px;
+            padding: 12px;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            font-size: 16px;
+            resize: vertical;
+            box-sizing: border-box;
+            margin-bottom: 15px;
+        }
+        #generateBtn {
+            width: 100%;
+            padding: 14px;
+            background: #0070ba;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 18px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background 0.3s;
+        }
+        #generateBtn:hover {
+            background: #005ea6;
+        }
+        #generateBtn:disabled {
+            background: #95a5a6;
+            cursor: not-allowed;
+        }
+        #loading {
+            display: none;
+            text-align: center;
+            color: #666;
+            margin-top: 15px;
+            font-weight: 500;
+        }
+        #results {
+            display: none;
+            margin-top: 25px;
+            border-top: 2px solid #eee;
+            padding-top: 20px;
+        }
+        ul {
+            list-style-type: none;
+            padding: 0;
+            margin: 0;
+        }
+        li {
+            background: #f9f9f9;
+            margin-bottom: 8px;
+            padding: 12px 14px;
+            border-radius: 6px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-left: 4px solid #764ba2;
+        }
+        .total {
+            font-size: 22px;
+            font-weight: bold;
+            text-align: right;
+            margin: 18px 0;
+            color: #27ae60;
+        }
+        #paypal-button-container {
+            margin-top: 10px;
+            min-height: 45px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>🎉 PartyGenie AI</h1>
+        <p class="subtitle">Enter your party details and AI will generate a shopping list!</p>
+        
+        <textarea id="partyDetails" placeholder="Example: Neon theme birthday party for 10 people, budget $150..."></textarea>
+        
+        <button id="generateBtn" onclick="generateList()">✨ Generate Shopping List</button>
+        
+        <div id="loading">AI is generating your list... Please wait ⏳</div>
+
+        <div id="results">
+            <h3>🛒 Your Shopping List</h3>
+            <ul id="shoppingList"></ul>
+            
+            <div class="total">
+                Total: $<span id="totalAmount">0.00</span>
+            </div>
+            
+            <!-- Official PayPal Button will be rendered here -->
+            <div id="paypal-button-container"></div>
+        </div>
+    </div>
+
+    <script>
+        let curr
+        async function generateList() {
+            const details = document.getElementById('partyDetails').value.trim();
+            if (!details) {
+                alert("Please enter the party details!");
+                return;
+            }
+
+            const generateBtn = document.getElementById('generateBtn');
+            const loading = document.getElementById('loading');
+            const results = document.getElementById('results');
+            const listContainer = document.getElementById('shoppingList');
+            const paypalContainer = document.getElementById('paypal-button-container');
+
+            // Reset UI
+            generateBtn.disabled = true;
+            loading.style.display = 'block';
+            results.style.display = 'none';
+            listContainer.innerHTML = '';
+            paypalContainer.innerHTML = ''; // Clear previous PayPal button
+
+            try {
+                const response = await fetch('/api/generate-list', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ partyDetails: details })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok || data.error) {
+                    throw new Error(data.error || "Failed to generate list");
+                }
+
+                // Display the list
+                data.shoppingList.forEach(item => {
+                    const li = document.createElement('li');
+                    li.innerHTML = `
+                        <span>${item.quantity}x ${item.name}</span>
+                        <strong>$${Number(item.price).toFixed(2)}</strong>
+                    `;
+                    listContainer.appendChild(li);
+                });
+
+                currentTotal = Number(data.totalAmount) || 0;
+                document.getElementById('totalAmount').innerText = currentTotal.toFixed(2);
+
+                results.style.display = 'block';
+                loading.style.display = 'none';
+                generateBtn.disabled = false;
+
+                // Render PayPal button
+                renderPayPalButton();
+
+            } catch (error) {
+                console.error(error);
+                alert("Error: " + error.message);
+                loading.style.display = 'none';
+                generateBtn.disabled = false;
+            }
+        }
+
+        function renderPayPalButton() {
+            if (currentTotal <= 0) return;
+
+            // Clear any existing button
+            document.getElementById('paypal-button-container').innerHTML = '';
+
+            paypal.Buttons({
+                style: {
+                    layout: 'vertical',
+                    color: 'gold',
+                    shape: 'rect',
+                    label: 'paypal'
+                },
+                createOrder: async function () {
+                    try {
+                        const res = await fetch('/api/paypal/create-order', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ amount: currentTotal.toFixed(2) })
+                        });
+
+                        const data = await res.json();
+
+                        if (!data.id) {
+                            throw new Error("Failed to create order");
+                        }
+                        return data.id;
+                    } catch (err) {
+                        console.error(err);
+                        alert("Error occurred while creating the order");
+                        throw err;
+                    }
+                },
+                onApprove: async function (data) {
+                    try {
+                        const res = await fetch(`/api/paypal/capture-order/${data.orderID}`, {
+                            method: 'POST'
+                        });
+                        const result = await res.json();
+
+                        if (result.status === "COMPLETED") {
+                            alert("🎉 Payment Successful! Your party is planned.");
+                        } else {
+                            alert("Payment was not completed. Status: " + (result.status || "Unknown"));
+                        }
+                    } catch (err) {
+                        console.error(err);
+                        alert("Error occurred while capturing the payment");
+                    }
+                },
+                onCancel: function () {
+                    alert("You cancelled the payment.");
+                },
+                onError: function (err) {
+                    console.error("PayPal Error:", err);
+                    alert("An error occurred during payment. Please try again.");
+                }
+            }).render('#paypal-button-container');
+        }
+    </script>
+</body>
+</html>
