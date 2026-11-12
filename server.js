@@ -1,4 +1,4 @@
-// 1. Import required packages
+7// 1. Import required packages
 require('dotenv').config();
 const express = require('express');
 const { GoogleGenAI } = require('@google/genai');
@@ -6,14 +6,14 @@ const path = require('path');
 
 // 2. Initialization
 const app = express();
-const PORT = 3000;
+const PORT = process.env.port ||3000;
 
 // Middleware
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Gemini Setup
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY,apiversion: 'v1beta'});
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY,apiversion: 'v1beta'});3
 
 // ==========================================
 // ROUTE 1: AI Shopping List Generator
@@ -167,7 +167,7 @@ app.post('/api/paypal/capture-order/:orderId', async (req, res) => {
         const captureResponse = await fetch(`https://api-m.sandbox.paypal.com/v2/checkout/orders/${orderId}/capture`, {
             method: 'POST',
             headers: {
-                'Authorization': `Bearer ${accessToken}`,
+   =             'Authorization': `Bearer ${accessToken}`,
                 'Content-Type': 'application/json',
             }
         });
